@@ -5,40 +5,69 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.*
+import androidx.lifecycle.lifecycleScope
 import com.truerewind.app.player.VideoPlayerManager
+import com.truerewind.app.processing.VideoProcessingManager
+import com.truerewind.app.ui.ProcessingScreen
 import com.truerewind.app.ui.VideoPlayerScreen
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
     private lateinit var videoPlayerManager: VideoPlayerManager
+    private val processingManager = VideoProcessingManager()
 
-    // Video picker (opens Android file chooser)
+    private var selectedVideo: Uri? = null
+
     private val videoPicker =
         registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
             uri?.let {
-                videoPlayerManager.loadVideo(it)
+                selectedVideo = it
+                startProcessing(it)
             }
         }
+
+    private var uiState: MutableState<String>? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Initialize player
         videoPlayerManager = VideoPlayerManager(this)
 
-        // Set UI
         setContent {
-            VideoPlayerScreen(videoPlayerManager)
+
+            val state = remember { mutableStateOf("IDLE") }
+            uiState = state
+
+            when (state.value) {
+
+                "PROCESSING" -> ProcessingScreen()
+
+                "PLAYER" -> VideoPlayerScreen(videoPlayerManager)
+
+            }
         }
 
-        // Launch file picker
         videoPicker.launch("video/*")
+    }
+
+    private fun startProcessing(uri: Uri) {
+
+        uiState?.value = "PROCESSING"
+
+        lifecycleScope.launch {
+
+            val processedVideo = processingManager.processVideo(uri)
+
+            videoPlayerManager.loadVideo(processedVideo)
+
+            uiState?.value = "PLAYER"
+        }
     }
 
     override fun onDestroy() {
         super.onDestroy()
-
-        // Release player to prevent memory leaks
         videoPlayerManager.release()
     }
 }

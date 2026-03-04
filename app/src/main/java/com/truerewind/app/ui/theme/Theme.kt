@@ -1,4 +1,4 @@
-package com.truerewind.app.ui
+package com.truerewind.app.ui.theme
 
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
